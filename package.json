@@ -3,11 +3,13 @@
   "version": "0.0.0",
   "description": "NDJS grunt building tasks",
   "main": "tasks/nd-grunt.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+
   "author": "Asaf Amrami <asaf_am@yahoo.com>",
   "license": "AGPL-1.0",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/asafamr/nd-grunt.git"
+  },
   "dependencies": {
 
   },
