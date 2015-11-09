@@ -1,6 +1,6 @@
-# ND-Angular
+# ND-grunt
 
-NDJS angualr front end
+NDJS grunt build tasks
 
 # Usage
 
