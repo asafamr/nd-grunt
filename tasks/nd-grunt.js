@@ -1,11 +1,4 @@
-/*
-* duck-grunt
-*
-*
-* Copyright (c) 2015 asaf_am
-* Licensed under the MIT license.
-*/
-
+(function(){
 'use strict';
 
 
@@ -14,6 +7,7 @@ var archiver=require('archiver');
 var fs = require('fs-extra');
 var path = require('path');
 var childProcess =require('child_process');
+var open =require('open');
 
 var copyPrmosified=Promise.promisify(fs.copy);
 var emptyDirPromisified=Promise.promisify(fs.emptyDir);
@@ -37,6 +31,9 @@ function runAsync(grunt,cmd,cwd)
 		proc.on('close', function (code) {
 			grunt.log.debug('running '+cmd+' child process exited with code ' + code);
 			resolve();
+		});
+		process.on('exit', function () {
+		    proc.kill();
 		});
 
 	});
@@ -135,7 +132,7 @@ function createNWPackage(grunt,appDir,tempDir,toZip)
 });
 }
 
-var createBuildDir=function(grunt,nwPackage,buildDir,nwjsDir)
+function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 {
 
 	grunt.log.debug('Ensuring empty build dir...');
@@ -148,7 +145,7 @@ var createBuildDir=function(grunt,nwPackage,buildDir,nwjsDir)
 			return copyPrmosified(nwPackage,buildDir+'/package.nw');	}
 		)
 		;
-	};
+	}
 	var compile=function(grunt,compilerPath,args)
 	{
 		return new Promise(function (resolve, reject) {
@@ -169,45 +166,10 @@ var createBuildDir=function(grunt,nwPackage,buildDir,nwjsDir)
 
 		});
 	};
-	var emptyDirWithRetry=function(grunt,path,nTries,timeout,onCleaned)
-	{
-		return new Promise(function (resolve, reject) {
-			void reject;
-			var tryDeleteDir= function(triesLeft)
-			{
-				fs.emptyDir( path,
-					function (err) {
-						if (err)
-						{
-							//we couldnt delete temp dir - retry if needed
-							if(triesLeft!==0)
-							{
-								grunt.log.debug('could not empty dir ' + path +' retrying...');
-								setTimeout(function() {tryDeleteDir(triesLeft-1);},	timeout);
-							}
-							else
-							{
-								grunt.log.error('could not empty dir ' + path +' '+ err);
-								resolve();//not rejecting for this
-							}
 
-						}
-						else
-						{
-							//tmp dir deleted
-							onCleaned();
-							resolve();
-						}
-					}
-				);
-
-			};
-			tryDeleteDir(nTries);
-		});
-	};
 	module.exports = function (grunt) {
 
-		grunt.registerTask('duck_grunt', 'duck packer grunt task', function () {
+		grunt.registerTask('nd_pack', 'duck packer grunt task', function () {
 			var done = this.async();
 			var tmp = require('tmp');
 			var options=this.options();
@@ -242,13 +204,41 @@ var createBuildDir=function(grunt,nwPackage,buildDir,nwjsDir)
 
 
 		});
-		grunt.loadNpmTasks('grunt-node-inspector');
+
+		//loads from local node_modules
+		var cwd = process.cwd();
+	  process.chdir(__dirname+ '/..');
+	  grunt.loadNpmTasks('grunt-node-inspector');
+	  process.chdir(cwd);
 
 
-		grunt.registerTask('duck_debug','debug as nodejs server', function()
+
+		grunt.registerTask('nd_debug','debug as nodejs server', function()
 		{
+			var done = this.async();
+			var options=this.options();
+			grunt.log.write(JSON.stringify(options));
+
+			var path=require('path');
+			var mainPath=path.normalize(__dirname+'/../bootstrap/node-debug/main.js');
+			var args=options;
+			var base64Args= (new Buffer(JSON.stringify(args))).toString('base64');
+			runAsync(grunt,'node '+mainPath + ' '+base64Args).then(function(succ)
+				{
+
+					done();
+				}
+			);
+			setTimeout(function(){
+
+				open('http://localhost:'+options['console-port']);
+			},500);
+
+			/*
 			var options = this.options();
 			var done = this.async();
+
+
 
 			var sharedArgs={
 				version:true,
@@ -295,10 +285,10 @@ var createBuildDir=function(grunt,nwPackage,buildDir,nwjsDir)
 				function(soFar,val){
 					if(val==='hidden')
 					{
-						var val=nodeInspectorArgs[val];
-						var toAdd=val.reduce(
-							function(soFar,val){
-								return soFar.concat(['--hidden',JSON.stringify(val)]);
+						var niaval=nodeInspectorArgs[val];
+						var toAdd=niaval.reduce(
+							function(soFar,nextval){
+								return soFar.concat(['--hidden',JSON.stringify(nextval)]);
 							},[]);
 						return soFar.concat(toAdd);
 					}
@@ -341,14 +331,15 @@ var createBuildDir=function(grunt,nwPackage,buildDir,nwjsDir)
 		);
 
 		setTimeout(function(){
-			open("http://www.google.com");
+			open('http://www.google.com');
 		},2000
 		);
 
 
 
 
-
+*/
 		});
 
 	};
+})();

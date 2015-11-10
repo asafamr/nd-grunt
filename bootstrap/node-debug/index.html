@@ -1,0 +1,39 @@
+<html>
+<header>
+<style>
+#maindiv{width:500px;margin: auto}
+#ndheader{    font-size: 40px;
+    margin: auto;
+
+    text-align: center;
+    color: #91B506;}
+.button{    width: 300px;
+    background: white;
+    border-radius: 3px;
+    border: 1px solid black;
+    padding: 10px;
+    margin: 10px auto 10px auto;
+    text-align: center;}
+
+a{
+ text-decoration:none;
+ color:black;
+}
+body {background-color: #444444;
+    font-family: "Lucida Console", Monaco, monospace;
+    font-size: 20px;}
+</style>
+</header>
+<body>
+  <div id="maindiv">
+  <div id="ndheader">&lt;NDJS Console&gt;</div>
+  <a href="<%=inspectorlink%>"><div class="button">Open node inspector</div></a>
+  <a href="<%=inspectorlink%>"><div class="button">Open frontend</div></a>
+  <a href="<%=inspectorlink%>"><div class="button">Restart backend</div></a>
+</div>
+<!--
+DEBUG:
+args:<%=JSON.stringify(args)%>
+-->
+</body>
+</html>

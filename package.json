@@ -3,8 +3,10 @@
   "version": "0.0.0",
   "description": "NDJS grunt building tasks",
   "main": "tasks/nd-grunt.js",
-
-  "author": "Asaf Amrami <asaf_am@yahoo.com>",
+  "author": {
+    "name": "Asaf Amrami",
+    "email": "asaf_am@yahoo.com"
+  },
   "license": "AGPL-1.0",
   "repository": {
     "type": "git",
@@ -14,6 +16,13 @@
 
   },
   "devDependencies": {
-    "grunt-node-inspector": "^0.1.6"
+    "archiver": "^0.16.0",
+    "bluebird": "^3.0.5",
+    "fs-extra": "^0.26.2",
+    "grunt": "^0.4.5",
+    "grunt-node-inspector": "^0.4.1",
+    "grunt-nw-builder": "^2.0.0",
+    "lodash.template": "^3.6.2",
+    "open": "0.0.5"
   }
 }

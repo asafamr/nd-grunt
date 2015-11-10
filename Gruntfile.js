@@ -1,11 +1,3 @@
-/*
- * duck-grunt
- *
- *
- * Copyright (c) 2015 asaf_am
- * Licensed under the MIT license.
- */
-
 'use strict';
 
 module.exports = function (grunt) {
