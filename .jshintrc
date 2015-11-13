@@ -15,7 +15,7 @@
     "unused": true,
 
     "globals": {
-        "angular": true
-
+        "angular": true,
+        "JSON":true
     }
 }

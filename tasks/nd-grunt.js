@@ -4,6 +4,7 @@
 
 var Promise = require('bluebird');
 var archiver=require('archiver');
+var treeKill=require('tree-kill');
 var fs = require('fs-extra');
 var path = require('path');
 var childProcess =require('child_process');
@@ -12,29 +13,34 @@ var open =require('open');
 var copyPrmosified=Promise.promisify(fs.copy);
 var emptyDirPromisified=Promise.promisify(fs.emptyDir);
 
+var childProcesses=[];
 
 
-function runAsync(grunt,cmd,cwd)
+
+function runAsync(grunt,cmd,name,cwd)
 {
 	return new Promise(function (resolve, reject) {
 		void reject ;
-		grunt.log.debug('running '+cmd );
+		var me={pid:null,finished:false,name:name};
+		grunt.log.debug(name+' running '+cmd );
 		var proc = childProcess.exec(cmd,{cwd:cwd, env: process.env});
 
 		proc.stdout.on('data', function (data) {
-			grunt.log.debug('running '+cmd+' stdout: ' + data);
+			grunt.log.debug('running '+name+' stdout: ' + data);
 		});
 
 		proc.stderr.on('data', function (data) {
-			grunt.log.debug('running '+cmd+' stderr: ' + data);
+			grunt.log.debug(name+' stderr: ' + data);
+
 		});
 		proc.on('close', function (code) {
-			grunt.log.debug('running '+cmd+' child process exited with code ' + code);
+			grunt.log.debug(name+' child process exited with code ' + code);
+			me.finished=true;
 			resolve();
 		});
-		process.on('exit', function () {
-		    proc.kill();
-		});
+		me.pid=proc.pid;
+		childProcesses.push(me);
+
 
 	});
 }
@@ -42,7 +48,7 @@ function copyFileThenRun(grunt,filePath,toPath,cmd)
 {
 	grunt.log.debug('copying ' + filePath +' '+toPath);
 	return copyPrmosified(filePath,toPath+'/'+path.basename(filePath)).then(function(){
-		return runAsync(grunt,cmd,toPath);
+		return runAsync(grunt,cmd,'copy',toPath);
 	});
 }
 
@@ -206,10 +212,10 @@ function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 		});
 
 		//loads from local node_modules
-		var cwd = process.cwd();
-	  process.chdir(__dirname+ '/..');
-	  grunt.loadNpmTasks('grunt-node-inspector');
-	  process.chdir(cwd);
+		//var cwd = process.cwd();
+	  //process.chdir(__dirname+ '/..');
+	  //grunt.loadNpmTasks('grunt-node-inspector');
+	//  process.chdir(cwd);
 
 
 
@@ -217,18 +223,64 @@ function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 		{
 			var done = this.async();
 			var options=this.options();
-			grunt.log.write(JSON.stringify(options));
+
 
 			var path=require('path');
-			var mainPath=path.normalize(__dirname+'/../bootstrap/node-debug/main.js');
+			var consolePath=path.normalize(__dirname+'/../bootstrap/node-debug/console.js');
 			var args=options;
+			args.basePath=process.cwd();
+			grunt.log.debug('NDJS Debug params:'+JSON.stringify(args));
 			var base64Args= (new Buffer(JSON.stringify(args))).toString('base64');
-			runAsync(grunt,'node '+mainPath + ' '+base64Args).then(function(succ)
-				{
 
-					done();
+			function killChildProc() {
+				childProcesses.forEach(function(child) {
+					try {
+						if(!child.finished)
+						{
+							grunt.log.debug('killing sub process '+child.name);
+							child.finished=true;
+							treeKill(child.pid);
+						}
+					} catch (e) {
+						grunt.log.debug('could not kill child process '+e);
+					} finally {
+
+					}
+
+			  });
+			}
+			process.on('SIGINT', process.exit); // catch ctrl-c
+			process.on('SIGTERM', process.exit); // catch kill
+			process.once('exit', killChildProc);
+
+			runAsync(grunt,'node '+consolePath + ' '+base64Args,'console').then(function(succ)
+				{
+					void succ;
+					killChildProc();
+					setTimeout(done,1000);
+					//done();
 				}
 			);
+
+			var nodeInspectorModulePath=require.resolve('node-inspector');
+
+			var nodeDebugPath=path.dirname(nodeInspectorModulePath)+'/bin/node-debug.js';
+			var backendPath=path.normalize(__dirname+'/../bootstrap/node-debug/backend.js');
+			var nodeDebugArgs=['--cli'/* =dont open browser*/,'--debug-port',args['debugger-port'],
+											'--web-port',args['node-inspector-port'],'--preload','false',
+											//'--hidden','bower'
+										'--save-live-edit',true].join(' ');
+
+			runAsync(grunt,['node',nodeDebugPath,nodeDebugArgs,backendPath,base64Args].join(' '),'inspector').then(function(succ)
+				{
+					void succ;
+					killChildProc();
+					setTimeout(done,1000);
+					//done();
+				}
+			);
+
+
 			setTimeout(function(){
 
 				open('http://localhost:'+options['console-port']);
