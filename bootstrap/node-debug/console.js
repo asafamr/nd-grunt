@@ -25,7 +25,7 @@
 
   function getAllParams()
   {
-    return {frontendLink:'#',backendLink:'http://localhost:'+args['node-inspector-port'],
+    return {frontendLink:'http://localhost:'+args['frontend-port'],backendLink:'http://localhost:'+args['node-inspector-port'],
     restartLink:'javascript:restart();',args:args};
   }
 

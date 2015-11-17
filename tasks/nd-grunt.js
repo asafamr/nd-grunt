@@ -267,7 +267,8 @@ function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 			var nodeDebugPath=path.dirname(nodeInspectorModulePath)+'/bin/node-debug.js';
 			var backendPath=path.normalize(__dirname+'/../bootstrap/node-debug/backend.js');
 			var nodeDebugArgs=['--cli'/* =dont open browser*/,'--debug-port',args['debugger-port'],
-											'--web-port',args['node-inspector-port'],'--preload','false',
+											'--web-port',args['node-inspector-port'],'--preload','false','--debug-brk=0',
+											'--stack-trace-limit=100',
 											//'--hidden','bower'
 										'--save-live-edit',true].join(' ');
 
@@ -286,111 +287,7 @@ function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 				open('http://localhost:'+options['console-port']);
 			},500);
 
-			/*
-			var options = this.options();
-			var done = this.async();
 
-
-
-			var sharedArgs={
-				version:true,
-				'debug-port':5858,
-				'web-host':'0.0.0.0',
-				'web-port':8080
-			};
-			var nodeDebugArgs={
-				'debug-brk':true,
-				nodejs:[],
-				script:[],
-				cli:false
-			};
-			var inspectorArgs={
-				'save-live-edit':false,
-				preload:true,
-				inject:true,
-				hidden:[],
-				'stack-trace-limit':50,
-				'ssl-key':'',
-				'ssl-cert':''
-			};
-			var metaArgs={
-				nodejs:'preArr',
-				script:'postArr',
-				hidden:'preArr',
-				'ssl-key':'removeEmpty',
-				'ssl-cert':'removeEmpty'
-			};
-			var nodeInspectorArgs={
-				//'web-port': 1337,
-				//'web-host': 'localhost',
-				//'debug-port': 5857,
-				//'save-live-edit': true,
-				'no-preload': true,
-				'cli':true,
-				//'stack-trace-limit': 4,
-				'hidden': ['node_modules/']
-			};
-
-
-
-			var args=Object.keys(nodeInspectorArgs).reduce(
-				function(soFar,val){
-					if(val==='hidden')
-					{
-						var niaval=nodeInspectorArgs[val];
-						var toAdd=niaval.reduce(
-							function(soFar,nextval){
-								return soFar.concat(['--hidden',JSON.stringify(nextval)]);
-							},[]);
-						return soFar.concat(toAdd);
-					}
-					else if (nodeInspectorArgs[val]===true) {
-						return soFar.concat(['--'+val]);
-					}
-					return soFar.concat(['--'+val,nodeInspectorArgs[val]]);
-				},[]);
-				console.log(args);
-
-			grunt.util.spawn({
-	      cmd: 'node',
-	      args: [require.resolve('node-inspector/bin/inspector')].concat(args),
-	      opts: {
-	        stdio: 'inherit'
-	      }
-	    },
-	    function (error) {
-	      if (error) {
-	        grunt.fail.fatal(error);
-	      }
-	      //done();
-	    });
-
-			setTimeout(function(){
-				console.log([require.resolve('node-inspector/bin/node-debug')].concat(args,['c:/ws/duck/ts/files/test.js']));
-				grunt.util.spawn({
-					cmd: 'node',
-					args:  [require.resolve('node-inspector/bin/node-debug')].concat(args,['c:/ws/duck/ts/files/test.js']),
-					opts: {
-						stdio: 'inherit'
-					}
-				},
-				function (error) {
-					if (error) {
-						grunt.fail.fatal(error);
-					}
-					//done();
-	    });},1000
-		);
-
-		setTimeout(function(){
-			open('http://www.google.com');
-		},2000
-		);
-
-
-
-
-*/
 		});
 
 	};
