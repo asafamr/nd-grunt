@@ -8,10 +8,10 @@
     backendInstance=require(args.basePath+'/node_modules/nd-node').create(path.normalize(args.basePath+'/ndfile.js'));
     backendInstance.startLoad();
   }
-  function RunUiAction(actionName,actionParam)
+  function CallUiAction(actionName,actionParam)
   {
     //wait for load?
-    return backendInstance.getModule('$uiActions').runAction(actionName,actionParam);
+    return backendInstance.getModule('$uiActions').callAction(actionName,actionParam);
   }
 
   try {
@@ -25,7 +25,7 @@
 
 
 
-  var backendConfig=fs.readFileSync(path.normalize(__dirname+'/backend-config.js'));
+  var interfaceConfig=fs.readFileSync(path.normalize(__dirname+'/interface-config.js'));
 
   //RestartBackend();
   app.get('/api/restart', function (req, res) {
@@ -34,23 +34,26 @@
 });
 
 var frontapp=express();
+frontapp.use(require('body-parser').json());
+
 frontapp.get('/config.js',
 function (req, res) {
-  res.send(backendConfig);
+  res.send(interfaceConfig);
 });
 
-frontapp.use(require('body-parser').json());
+
 frontapp.post('/api/uiaction/:uiaction', function (req, res) {
   if(backendInstance===null || !backendInstance.hasFinishedLoading())
   {
     return res.status(500).send('failed');
   }
-  RunUiAction(req.param('uiaction'),req.body).then(function(ret){
+
+  CallUiAction(req.params.uiaction,req.body).then(function(ret){
      res.json(ret);
   }).catch(function(err){
     res.status(500).send(err);
-  })
- 
+  });
+
 });
 
 frontapp.get('/api/getUIActions', function (req, res) {

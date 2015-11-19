@@ -24,7 +24,9 @@ function setPersistent(key,value)
 }
 function callUiAction(actionName,actionParams)
 {
-  return $.ajax( {type:'POST',cache:false,url:'/api/uiaction/'+actionName,data:actionParams });
+  if(!actionParams){actionParams=[];}
+  actionParams=$.map(actionParams, function(value){return value;});//weird bug in chrome got actionParams as object...
+  return $.ajax( {type:'POST',cache:false,url:'/api/uiaction/'+actionName,contentType: 'application/json',data:JSON.stringify(actionParams) });
 }
 function getUiActions()
 {
