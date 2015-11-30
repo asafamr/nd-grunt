@@ -3,9 +3,43 @@
   var args=JSON.parse(new Buffer(process.argv[2], 'base64').toString('ascii'));
 
   var backendInstance=null;
+
+
+
+  var fs = require('fs');
+  var path = require('path');
+  var express = require('express');
+  var _ = require('lodash');
+  var app=express();
+
+
+  var modulesCachePreStart=null;
+  function RevertModulesCache()
+  {
+    if(!modulesCachePreStart)
+    {
+      return;
+    }
+    var keys=_.keys(require.cache);
+    keys.forEach(function(mod)
+  {
+    if(!modulesCachePreStart.hasOwnProperty(mod))
+    {
+      delete require.cache[mod];
+    }
+  });
+
+  }
   function RestartBackend()
   {
+    if(modulesCachePreStart===null)
+    {
+      modulesCachePreStart=_.mapValues(require.cache,true);
+    }
+    //ClearModulesCache();
     backendInstance=require(args.basePath+'/node_modules/nd-node').create(path.normalize(args.basePath+'/ndfile.js'));
+    var backPath=path.join(args.basePath,args.ndoptions.backend);
+    backendInstance.registerModulesDir(backPath);
     backendInstance.startLoad();
   }
   function CallUiAction(actionName,actionParam)
@@ -17,11 +51,6 @@
   try {
 
 
-  var fs = require('fs');
-  var path = require('path');
-  var express = require('express');
-  var app=express();
-
 
 
 
@@ -29,8 +58,9 @@
 
   //RestartBackend();
   app.get('/api/restart', function (req, res) {
+    RevertModulesCache();
     RestartBackend();
-    res.send('OK');
+    res.json({ok:true});;
 });
 
 var frontapp=express();
@@ -51,7 +81,8 @@ frontapp.post('/api/uiaction/:uiaction', function (req, res) {
   CallUiAction(req.params.uiaction,req.body).then(function(ret){
      res.json(ret);
   }).catch(function(err){
-    res.status(500).send(err);
+    console.log('error: '+err.stack);
+    res.status(500).send(err.message);
   });
 
 });

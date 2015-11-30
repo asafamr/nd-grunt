@@ -3,12 +3,12 @@
 
 
 var Promise = require('bluebird');
-var archiver=require('archiver');
 var treeKill=require('tree-kill');
 var fs = require('fs-extra');
 var path = require('path');
 var childProcess =require('child_process');
 var open =require('open');
+var _ =require('lodash');
 
 var copyPrmosified=Promise.promisify(fs.copy);
 var emptyDirPromisified=Promise.promisify(fs.emptyDir);
@@ -16,14 +16,18 @@ var emptyDirPromisified=Promise.promisify(fs.emptyDir);
 var childProcesses=[];
 
 
-
-function runAsync(grunt,cmd,name,cwd)
+function escapeShell(cmd) {
+	cmd=''+cmd;
+  return '"'+cmd.replace(/(["'$`\\])/g,'\\$1')+'"';
+}
+function runAsync(grunt,cmd,args,name,cwd)
 {
+	var fullCmd=[cmd].concat(_.map(args,escapeShell)).join(' ');
 	return new Promise(function (resolve, reject) {
 		void reject ;
 		var me={pid:null,finished:false,name:name};
-		grunt.log.debug(name+' running '+cmd );
-		var proc = childProcess.exec(cmd,{cwd:cwd, env: process.env});
+		grunt.log.debug(name+' running '+fullCmd );
+		var proc = childProcess.exec(fullCmd,{cwd:cwd, env: process.env});
 
 		proc.stdout.on('data', function (data) {
 			grunt.log.debug('running '+name+' stdout: ' + data);
@@ -44,168 +48,132 @@ function runAsync(grunt,cmd,name,cwd)
 
 	});
 }
-function copyFileThenRun(grunt,filePath,toPath,cmd)
-{
-	grunt.log.debug('copying ' + filePath +' '+toPath);
-	return copyPrmosified(filePath,toPath+'/'+path.basename(filePath)).then(function(){
-		return runAsync(grunt,cmd,'copy',toPath);
-	});
-}
 
-function zipDir(grunt,dir,destPath)
+
+
+
+function getMetadataParams(config)
 {
-	function removePrefixDir(file,basedir)
+	var ret=[];
+	addToRetIfDefined('--description',config.description);
+	addToRetIfDefined('--productname',config.productname);
+	addToRetIfDefined('--company',config.company);
+	addToRetIfDefined('--comments',config.comments);
+	addToRetIfDefined('--copyright',config.copyright);
+	addToRetIfDefined('--trademarks',config.trademarks);
+	addToRetIfDefined('--internalname',config.internalname);
+	addToRetIfDefined('--originalname',config.originalname);
+	addToRetIfDefined('--version',config.version);
+	if(config.icon)
 	{
-		return file.substr(basedir.length+1).replace('\\','/');
+		ret.push('--icon');
+		ret.push(path.resolve(config.etc,config.icon));
 	}
-
-	return new Promise(function(resolve,reject){
-		var output = fs.createWriteStream(destPath);
-		var archive = archiver('zip');
-
-		output.on('close', function() {
-			grunt.log.debug('Zip closed, ' + archive.pointer() + ' total bytes written');
-			resolve();
-		});
-
-		archive.on('error', function(err) {
-			reject(err);
-		});
-
-		archive.pipe(output);
-
-		grunt.file.expand(dir+'/**/*.*').forEach(function(file) {
-			grunt.log.debug('compressing '+file);
-			if(grunt.file.isFile(file))
-			{
-				archive.append(fs.createReadStream(file), { name: removePrefixDir(file,dir) });
-			}
-		});
-		archive.finalize();
-
-	});
-}
-
-function doRegexReplaceOnfile(grunt,filePath,regex,replace)
-{
-	return new Promise(function(resolve,reject){
-		fs.readFile(filePath, 'utf8', function (err,data) {
-			if (err) {
-				reject(err);
-				return;
-			}
-			var result = data.replace(regex,replace);// /"..\/bower_components/g, '"bower_components');
-
-			fs.writeFile(filePath, result, 'utf8', function (errWrite) {
-				if (errWrite)
-				{
-					reject(errWrite);
-					return;
-				}
-				resolve();
-			});
-		});
-	});
-}
-
-function createNWPackage(grunt,appDir,tempDir,toZip)
-{
-	return emptyDirPromisified(tempDir)
-	.then(function(){
-		//copy production node_modules
-		grunt.log.debug('copying production node_modules');
-		var packageJsonPath=process.cwd()+'/package.json';
-		return copyFileThenRun(grunt,packageJsonPath,tempDir,'npm install --production');
-	})
-	.then(function(){
-		//copy production bower_components
-		grunt.log.debug('copying production bower_components');
-		var packageJsonPath=process.cwd()+'/bower.json';
-		return copyFileThenRun(grunt,packageJsonPath,tempDir,'bower install --production --force-latest');
-	})
-	.then (function(){
-		//copy main app
-		grunt.log.debug('copying from '+appDir +' to '+tempDir);
-		return copyPrmosified(appDir,tempDir);})
-		.then(function()
-		{return doRegexReplaceOnfile(grunt,tempDir+'/index.html',/"..\/bower_components/g,'"bower_components');
-	})
-	.then(function()
-	{return doRegexReplaceOnfile(grunt,tempDir+'/index.html',/"..\/duck_client_modules/g,'"duck_client_modules');
-})
-.then (function(){
-	return zipDir(grunt,tempDir,toZip);
-});
-}
-
-function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
-{
-
-	grunt.log.debug('Ensuring empty build dir...');
-	return  emptyDirPromisified(buildDir)
-	.then(function (){
-		grunt.log.debug('Copying nwjs to build dir...');
-		return copyPrmosified(nwjsDir,buildDir);	})
-		.then(function (){
-			grunt.log.debug('Copying package to build dir...');
-			return copyPrmosified(nwPackage,buildDir+'/package.nw');	}
-		)
-		;
-	}
-	var compile=function(grunt,compilerPath,args)
+	return ret;
+	function addToRetIfDefined(argName,configValue)
 	{
-		return new Promise(function (resolve, reject) {
-			void(reject);//remove jshint unused param warning
-			var comp=childProcess.spawn(compilerPath,args);
-			comp.stdout.on('data', function (data) {
-				grunt.log.debug('stdout: ' + data);
-			});
-
-			comp.stderr.on('data', function (data) {
-				grunt.log.error('stderr: ' + data);
-			});
-
-			comp.on('close', function (code) {
-				grunt.log.debug('child process exited with code ' + code);
-				resolve();
-			});
-
-		});
+		if(configValue)
+		{
+			ret.push(argName);
+			ret.push(configValue);
+		}
+	}
+}
+function getNwjsPackageContent(config)
+{
+	var NOT_REQUIRED_TOKEN={};
+	var content=
+	{
+		'name': 'NDJS installer',
+		'description': 'NDJS installer',
+		'version': '1.0',
+		'main': 'index.html',
+		'node-main': 'index.js',
+		'window': {
+			'frame': false,
+			'toolbar': false,
+			'width': 720,
+			'height': 440,
+			'icon': NOT_REQUIRED_TOKEN,
+			'show': false,
+			'title': NOT_REQUIRED_TOKEN,
+			'fullscreen':false
+		}
 	};
+
+	_.merge(content,config,function(a,b){if(a){return b;}return NOT_REQUIRED_TOKEN;});
+	content=_.omit(content,function(x){return x===NOT_REQUIRED_TOKEN;});
+	content.window=_.omit(content.window,function(x){return x===NOT_REQUIRED_TOKEN;});
+	return JSON.stringify(content,null,2);
+}
+
+
+
 
 	module.exports = function (grunt) {
 
-		grunt.registerTask('nd_pack', 'duck packer grunt task', function () {
+		grunt.registerTask('nd_compile', 'ndjs compile grunt task', function () {
 			var done = this.async();
-			var tmp = require('tmp');
 			var options=this.options();
+			var nwjsPath=path.dirname(require('nw').findpath());
+			var buildDir=path.resolve(options.buildDir || 'build');
+			var packedDir=path.join(buildDir,'packed');
+			var nwPackagePath=path.join(packedDir,'package.nw');
+			var compilerPath=path.normalize(__dirname+'/../packer/packer.exe' );
+			var distOutPath=path.join(buildDir,options.outFile || 'out.exe');
+			var outgoingPath=path.resolve(options.ndoptions.outgoing || 'outgoing');
+			var ndDescPath=path.join(buildDir,'ndjs.desc');
+			var metdataParams=getMetadataParams(options.ndoptions);
 
-			var nwjsPath=path.normalize(__dirname + '/../nwjs');
-			var compilerPath=path.normalize(__dirname+'/../compiler/packer.exe' );
+			emptyDirPromisified(buildDir).then(function(){
+				grunt.log.debug('creating build directories...');
+				return emptyDirPromisified(packedDir);
+			}).then(function(){
+				return emptyDirPromisified(nwPackagePath);
+			}).then(function(){
+				return copyPrmosified(nwjsPath,packedDir);
+			}).then(function(){
+				grunt.log.debug('copying frontend...');
+				return copyPrmosified(path.resolve(options.ndoptions.frontend||'front'),nwPackagePath,{ filter:/^((?!node_modules).)*$/ ,dereference: true });
+			}).then(function(){
+				grunt.log.debug('copying backend modules...');
+				return copyPrmosified(path.resolve(options.ndoptions.backend||'back'),path.join(nwPackagePath,'ndjs_modules'));
+			}).then(function(){
+				grunt.log.debug('copying node_modules...');
+				return copyPrmosified(path.resolve('node_modules'),path.join(nwPackagePath,'node_modules'),{filter:/^((?!nd-grunt).)*$/ ,dereference: true });
+			}).then(function(){
+				grunt.log.debug('copying package.json...');
+				return copyPrmosified(path.resolve('package.json'),path.join(nwPackagePath,'package.json'));
+			}).then(function(){
+				grunt.log.debug('pruning dev node modules...');
+				return runAsync(grunt,'npm',['prune','-production'],'npm-prune-task',nwPackagePath);
+			}).then(function(){
+				grunt.log.debug('deduping node modules...');
+				return runAsync(grunt,'npm',['dedupe'],'npm-dedupe-task',nwPackagePath);
+			}).then(function(){
+				grunt.log.debug('nwjs package.json...');
+				return Promise.promisify(fs.writeFile)(path.join(nwPackagePath,'package.json'),getNwjsPackageContent(options.ndoptions));
+			}).then(function(){
+				grunt.log.debug('copying config files...');
+				return copyPrmosified(path.normalize(__dirname+'/../bootstrap/full-compile'),nwPackagePath);
+			}).then(function(){
+				grunt.log.debug('copying ndfile...');
+				return copyPrmosified('ndfile.js',path.join(nwPackagePath,'ndfile.js'));
+			}).then(function(){
+				grunt.log.debug('writing ndjs run description...');
+				return Promise.promisify(fs.writeFile)(ndDescPath,'{"run":"nw.exe"}');
+			}).then(function(){
+				grunt.log.debug('compiling...');
+				return runAsync(grunt,compilerPath,['--out',distOutPath,
+			'--block1',packedDir,'--block2',outgoingPath,'--nd-desc',ndDescPath,'--verbose'].concat(metdataParams),'compiler');}).then(done);
 
-
-			tmp.dir({unsafeCleanup:true,keep:true},function(err, tmpPath, cleanupCallback)
-			{
-				void cleanupCallback;
-				if (err)
-				{
-					throw err;
-				}
-				//tmpPath=options.buildDir;
-				//we have a temp directory
-				var packZip=path.normalize(tmpPath + '/package.zip');
-				var buildappDir=path.normalize(tmpPath + '/buildApp');
-				var buildDir=path.normalize(tmpPath + '/build');
-
-				createNWPackage(grunt,options.app,buildappDir,packZip)
-				.then(function(){return createBuildDir(grunt,packZip,buildDir,nwjsPath);})
-				.then(function(){return Promise.promisify(fs.ensureFile)(options.target);})
+			/*
 				.then(function(){return compile(grunt,compilerPath,['--out',options.target,
 				'--in',buildDir,'--exe','nw.exe','--verbose']);})
 				//.then(function(){emptyDirWithRetry(grunt,tmpPath,3,300,cleanupCallback);})
 				.then(done);
 
-			});
+			});*/
 
 
 
@@ -221,6 +189,7 @@ function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 
 		grunt.registerTask('nd_debug','debug as nodejs server', function()
 		{
+			process.env.BLUEBIRD_LONG_STACK_TRACES =1;
 			var done = this.async();
 			var options=this.options();
 
@@ -253,7 +222,7 @@ function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 			process.on('SIGTERM', process.exit); // catch kill
 			process.once('exit', killChildProc);
 
-			runAsync(grunt,'node '+consolePath + ' '+base64Args,'console').then(function(succ)
+			runAsync(grunt,'node',[consolePath,base64Args],'console').then(function(succ)
 				{
 					void succ;
 					killChildProc();
@@ -270,9 +239,9 @@ function createBuildDir(grunt,nwPackage,buildDir,nwjsDir)
 											'--web-port',args['node-inspector-port'],'--preload','false','--debug-brk=0',
 											'--stack-trace-limit=100',
 											//'--hidden','bower'
-										'--save-live-edit',true].join(' ');
+										'--save-live-edit',true];
 
-			runAsync(grunt,['node',nodeDebugPath,nodeDebugArgs,backendPath,base64Args].join(' '),'inspector').then(function(succ)
+			runAsync(grunt,'node',[nodeDebugPath].concat(nodeDebugArgs).concat([backendPath,base64Args]),'inspector').then(function(succ)
 				{
 					void succ;
 					killChildProc();
