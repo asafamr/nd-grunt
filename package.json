@@ -1,6 +1,5 @@
 {
   "name": "nd-grunt",
-  "version": "0.1.0",
   "description": "NDJS grunt building tasks",
   "main": "tasks/nd-grunt.js",
   "author": {
