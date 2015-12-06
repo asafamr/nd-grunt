@@ -11,8 +11,7 @@
     "type": "git",
     "url": "http://github.com/asafamr/nd-grunt.git"
   },
-  "dependencies": {},
-  "devDependencies": {
+  "dependencies": {
     "bluebird": "^3.0.5",
     "body-parser": "^1.14.1",
     "express": "^4.13.3",
@@ -21,11 +20,11 @@
     "grunt-nw-builder": "^2.0.0",
     "lodash": "^3.10.1",
     "lodash.template": "^3.6.2",
-    "nd-node": "0.0.0",
     "node-inspector": "^0.12.3",
     "open": "0.0.5",
     "nw": "^0.12.3",
     "tree-kill": "^1.0.0"
   },
-  "version": "0.1.13"
+  "devDependencies": {},
+  "version": "0.1.14"
 }
