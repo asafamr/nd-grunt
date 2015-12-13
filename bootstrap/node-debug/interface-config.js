@@ -17,8 +17,8 @@ var ndjs={};
 function getPersistent(key)
 {
   var current=localStorage['ndjs.'+key];
-  if(!current){return null};
-  return JSON.parse(localStorage['ndjs.'+key]);
+  if(!current){return null;}
+  return JSON.parse(current);
 }
 function setPersistent(key,value)
 {
